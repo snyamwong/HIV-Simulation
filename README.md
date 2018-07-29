@@ -2,7 +2,7 @@
 
 To run the program, compile using gcc (or mpicc depending at the stage you're in).
 
-The command will be ./<your executable program name> <number of generation> <size of the petri dish>
+The command will be ./ (your executable program name) (number of generation) (size of the petri dish)
   
 Example:
 
