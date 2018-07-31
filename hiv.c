@@ -83,8 +83,21 @@ void incubatePetriDish(struct Pixel** petriDish, int size, int gen)
             for(int y = 1; y < size - 1; y++)
             {
                 struct Pixel pixel = petriDish[x][y];
+
+                checkNeighbors(pixel, x, y);
             }
         }           
+    }
+}
+
+void checkNeighbors(struct Pixel pixel, int x, int y)
+{
+    for(int i = -1; i <= 1; i++)
+    {
+        for(int j = -1; j <= 1; y++)
+        {
+            
+        }
     }
 }
 
