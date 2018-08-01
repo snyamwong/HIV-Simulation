@@ -3,8 +3,9 @@
 #include <time.h>
 #include "project.h"
 
+int isNotBorder(int i, int j, int size);
 void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixel pixel, int x, int y);
-struct Pixel** initBuffer(struct Pixel** buffer, int size);
+void initBuffer(struct Pixel** buffer, int size);
 
 /*
  *  TODO: parallel
@@ -30,11 +31,11 @@ int main(int argc, char** argv)
     populatePetriDish(petriDish, size);
     initBuffer(buffer, size);
 
+    // Gen 0 Print
+    petriDishToPPM(petriDish, size, 0);
+
     // incubatePetriDish
     incubatePetriDish(petriDish, buffer, size, gen);
-
-    // print petri dish to ppm
-    petriDishToPPM(petriDish, size);
 
     return 0;
 }
@@ -51,7 +52,7 @@ struct Pixel** allocatePetriDish(int size)
     return petriDish;
 }
 
-struct Pixel** initBuffer(struct Pixel** buffer, int size)
+void initBuffer(struct Pixel** buffer, int size)
 {
     for(int i = 0; i < size; i++)
     {
@@ -62,8 +63,6 @@ struct Pixel** initBuffer(struct Pixel** buffer, int size)
             buffer[i][j] = pixel;
         }
     }
-
-    return buffer;
 }
 
 void populatePetriDish(struct Pixel** petriDish, int size)
@@ -77,15 +76,15 @@ void populatePetriDish(struct Pixel** petriDish, int size)
 
             struct Pixel pixel = {255, 255, 255};
 
-            // 8 means it's a virus (red)
-            if(randomPixel == 98)
+            // 98 means it's a virus (red)
+            if(isNotBorder(i, j, size) && randomPixel == 98)
             {
                 pixel = (struct Pixel) {255, 0, 0};
             }
-            // 9 means it's a cell
-            else if(randomPixel == 99)
+            // 99 means it's a cell (green)
+            else if(isNotBorder(i, j, size) && randomPixel == 99)
             {
-                pixel = (struct Pixel) {0, 0, 255};
+                pixel = (struct Pixel) {0, 255, 0};
             }
 
             petriDish[i][j] = pixel; 
@@ -93,10 +92,20 @@ void populatePetriDish(struct Pixel** petriDish, int size)
     }
 }
 
+int isNotBorder(int i, int j, int size)
+{
+    if (i != 0 && i != size - 1 && j != 0 && j != size - 1)
+    {
+        return 1;   
+    }
+ 
+    return 0;
+}
+
 void incubatePetriDish(struct Pixel** petriDish, struct Pixel** buffer, int size, int gen)
 {
-    // iterates from 0 to gen - 1
-    for(int i = 0; i < gen; i++)
+    // iterates from 1 to gen
+    for(int i = 1; i <= gen; i++)
     {
         // for this experiment, the edges are ignored and used as borders
         for(int x = 1; x < size - 1; x++)
@@ -106,54 +115,68 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** buffer, int size
                 struct Pixel centerPixel = petriDish[x][y];
 
                 checkNeighbors(petriDish, buffer, centerPixel, x, y);
+
+                // checkNeighbors, then move
             }
-        }           
+        }
+
+        // switch pointers between petriDish and buffer
+        struct Pixel** temp = petriDish;
+        petriDish = buffer;
+        buffer = temp;
+
+        // print petri dish to ppm
+        petriDishToPPM(petriDish, size, i);
     }
 }
 
 void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixel pixel, int x, int y)
 {
+    buffer[x][y] = pixel;
+
+    struct Pixel neighbor;
+    struct Pixel newPixel;
+
     for(int i = -1; i <= 1; i++)
     {
-        for(int j = -1; j <= 1; y++)
+        for(int j = -1; j <= 1; j++)
         {
-            struct Pixel neighbor = petriDish[x + i][y + i];
+            neighbor = petriDish[x + i][y + i];
 
-            if(pixel.green = 255 && neighbor.red == 255)
-            {
-                int chanceOfInfection = rand() % 100;
-
-                if(chanceOfInfection >= 60)
-                {
-                    pixel = (struct Pixel) {0, 255, 0};
-
-                    break;
-                }
-            }
-            else if(pixel.green = 255 && neighbor.green == 255)
+            // cell to virus infection (40% chance)
+            if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.blue == 0 && neighbor.green == 0)
             {
                 int chanceOfInfection = rand() % 100;
 
                 if(chanceOfInfection >= 40)
                 {
-                    pixel = (struct Pixel) {255, 0, 255};
+                    // blue if it's a cell to virus infection
+                    newPixel = (struct Pixel) {0, 255, 0};
 
-                    break;
+                    buffer[x][y] = newPixel;
+                }
+            }
+            // cell to cell infection (60% chance)
+            else if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.blue == 0 && neighbor.green == 255)
+            {
+                int chanceOfInfection = rand() % 100;
+
+                if(chanceOfInfection >= 60)
+                {
+                    // magneta if it's a cell to cell infection
+                    newPixel = (struct Pixel) {255, 0, 255};
+
+                    buffer[x][y] = newPixel;
                 }
             }
         }
     }
-
-    buffer[x][y] = pixel;
 }
 
-void petriDishToPPM(struct Pixel** petriDish, int size)
+void petriDishToPPM(struct Pixel** petriDish, int size, int gen)
 {
     // TODO: make sure that each node/processor prints to a different ppm, this can be done by printf to a file based on the node's rank
-
     // format: P3 = rgb color in ASCII, width and height in pixels, 255 is the max value of each color
-
-    int gen = 1;
 
     FILE* file;
     char* filename = malloc(20 * sizeof(char));
@@ -167,8 +190,10 @@ void petriDishToPPM(struct Pixel** petriDish, int size)
     {
         for(int j = 0; j < size; j++)
         {
-            fprintf(file, "%d %d %d ", petriDish[i][j].red, petriDish[i][j].blue, petriDish[i][j].green);
+            fprintf(file, "%d %d %d ", petriDish[i][j].red, petriDish[i][j].green, petriDish[i][j].blue);
         }
+
+        fprintf(file, "\n");
     }
 
     fclose(file);
@@ -180,7 +205,7 @@ void printPetriDish(struct Pixel** petriDish, int size)
     {   
         for(int j = 0; j < size; j++)
         {
-            printf("%d %d %d ", petriDish[i][j].red, petriDish[i][j].blue, petriDish[i][j].green);
+            printf("%d %d %d ", petriDish[i][j].red, petriDish[i][j].green, petriDish[i][j].blue);
         }
 
         printf("\n");

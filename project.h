@@ -18,12 +18,12 @@ void populatePetriDish(struct Pixel** petriDish, int size);
 /**
  * incubates the petri dish given the petri dish and number of generations
  */
-void incubatePetriDish(struct Pixel** petridish, int size, int gen);
+void incubatePetriDish(struct Pixel** petridish, struct Pixel** buffer, int size, int gen);
 
 /*
  *  converts petri dish to PPM file
  */
-void petriDishToPPM(struct Pixel** petriDish, int size);
+void petriDishToPPM(struct Pixel** petriDish, int size, int gen);
 
 /**
  *  prints petri dish
