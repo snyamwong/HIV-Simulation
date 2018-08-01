@@ -3,6 +3,9 @@
 #include <time.h>
 #include "project.h"
 
+void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixel pixel, int x, int y);
+struct Pixel** initBuffer(struct Pixel** buffer, int size);
+
 /*
  *  TODO: parallel
  *  TODO: better memory management (i.e convert petri dish to 1D array)
@@ -18,14 +21,17 @@ int main(int argc, char** argv)
 
     // allocate (dynamically) memory to the petriDish, and init all memory locations to be whitespace
     struct Pixel** petriDish;
-   
+    struct Pixel** buffer;
+
     petriDish = allocatePetriDish(size);
+    buffer = allocatePetriDish(size);
 
     // populate the petri dish with cells or viruses randomly
     populatePetriDish(petriDish, size);
+    initBuffer(buffer, size);
 
     // incubatePetriDish
-    // incubatePetriDish(petriDish, size, gen);
+    incubatePetriDish(petriDish, buffer, size, gen);
 
     // print petri dish to ppm
     petriDishToPPM(petriDish, size);
@@ -43,6 +49,21 @@ struct Pixel** allocatePetriDish(int size)
     }
 
     return petriDish;
+}
+
+struct Pixel** initBuffer(struct Pixel** buffer, int size)
+{
+    for(int i = 0; i < size; i++)
+    {
+        for(int j = 0; j < size; j++)
+        {
+            struct Pixel pixel = {255, 255, 255};
+
+            buffer[i][j] = pixel;
+        }
+    }
+
+    return buffer;
 }
 
 void populatePetriDish(struct Pixel** petriDish, int size)
@@ -72,7 +93,7 @@ void populatePetriDish(struct Pixel** petriDish, int size)
     }
 }
 
-void incubatePetriDish(struct Pixel** petriDish, int size, int gen)
+void incubatePetriDish(struct Pixel** petriDish, struct Pixel** buffer, int size, int gen)
 {
     // iterates from 0 to gen - 1
     for(int i = 0; i < gen; i++)
@@ -82,23 +103,48 @@ void incubatePetriDish(struct Pixel** petriDish, int size, int gen)
         {
             for(int y = 1; y < size - 1; y++)
             {
-                struct Pixel pixel = petriDish[x][y];
+                struct Pixel centerPixel = petriDish[x][y];
 
-                checkNeighbors(pixel, x, y);
+                checkNeighbors(petriDish, buffer, centerPixel, x, y);
             }
         }           
     }
 }
 
-void checkNeighbors(struct Pixel pixel, int x, int y)
+void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixel pixel, int x, int y)
 {
     for(int i = -1; i <= 1; i++)
     {
         for(int j = -1; j <= 1; y++)
         {
-            
+            struct Pixel neighbor = petriDish[x + i][y + i];
+
+            if(pixel.green = 255 && neighbor.red == 255)
+            {
+                int chanceOfInfection = rand() % 100;
+
+                if(chanceOfInfection >= 60)
+                {
+                    pixel = (struct Pixel) {0, 255, 0};
+
+                    break;
+                }
+            }
+            else if(pixel.green = 255 && neighbor.green == 255)
+            {
+                int chanceOfInfection = rand() % 100;
+
+                if(chanceOfInfection >= 40)
+                {
+                    pixel = (struct Pixel) {255, 0, 255};
+
+                    break;
+                }
+            }
         }
     }
+
+    buffer[x][y] = pixel;
 }
 
 void petriDishToPPM(struct Pixel** petriDish, int size)
@@ -106,15 +152,26 @@ void petriDishToPPM(struct Pixel** petriDish, int size)
     // TODO: make sure that each node/processor prints to a different ppm, this can be done by printf to a file based on the node's rank
 
     // format: P3 = rgb color in ASCII, width and height in pixels, 255 is the max value of each color
-    printf("P3\n%d %d\n255\n", size, size);     
+
+    int gen = 1;
+
+    FILE* file;
+    char* filename = malloc(20 * sizeof(char));
+    sprintf(filename, "gen_%d_test.ppm", gen);
+
+    file = fopen(filename, "w");
+
+    fprintf(file, "P3\n%d %d\n255\n", size, size);     
 
     for(int i = 0; i < size; i++)
     {
         for(int j = 0; j < size; j++)
         {
-            printf("%d %d %d ", petriDish[i][j].red, petriDish[i][j].blue, petriDish[i][j].green);
+            fprintf(file, "%d %d %d ", petriDish[i][j].red, petriDish[i][j].blue, petriDish[i][j].green);
         }
     }
+
+    fclose(file);
 }
 
 void printPetriDish(struct Pixel** petriDish, int size)
