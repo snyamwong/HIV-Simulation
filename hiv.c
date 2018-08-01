@@ -3,7 +3,9 @@
 #include <time.h>
 #include "project.h"
 
+int isFree(struct Pixel neighbor);
 int isNotBorder(int i, int j, int size);
+void movePixel(struct Pixel** buffer, int size, int x, int y);
 void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixel pixel, int x, int y);
 void initBuffer(struct Pixel** buffer, int size);
 
@@ -171,6 +173,33 @@ void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixe
             }
         }
     }
+}
+
+void movePixel(struct Pixel** buffer, int size, int x, int y)
+{
+    // generates from -1 ... 1
+    int i = rand() % 3 - 1;
+    int j = rand() % 3 - 1;
+
+    if(isNotBorder(x + i, y + j, size))
+    {
+        struct Pixel neighbor = buffer[x + i][y + j];
+
+        if(isFree(neighbor))
+        {
+            buffer[x + i][y + j] = buffer[x][y];
+        }
+    }
+}
+
+int isFree(struct Pixel neighbor)
+{
+    if(neighbor.red == 0 && neighbor.green == 0 && neighbor.blue == 0)
+    {
+        return 1;
+    }
+
+    return 0;
 }
 
 void petriDishToPPM(struct Pixel** petriDish, int size, int gen)
