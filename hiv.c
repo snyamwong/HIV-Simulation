@@ -3,16 +3,9 @@
 #include <time.h>
 #include "project.h"
 
-int isFree(struct Pixel neighbor);
-int isNotBorder(int i, int j, int size);
-void movePixel(struct Pixel** buffer, int size, int x, int y);
-void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixel pixel, int x, int y);
-void initBuffer(struct Pixel** buffer, int size);
-
 /*
  *  TODO: parallel
  *  TODO: better memory management (i.e convert petri dish to 1D array)
- *  TODO: incubatePetriDish
  */
 int main(int argc, char** argv)
 {
@@ -24,20 +17,17 @@ int main(int argc, char** argv)
 
     // allocate (dynamically) memory to the petriDish, and init all memory locations to be whitespace
     struct Pixel** petriDish;
-    struct Pixel** buffer;
+    struct Pixel** checkBuffer;
 
     petriDish = allocatePetriDish(size);
-    buffer = allocatePetriDish(size);
+    checkBuffer = allocatePetriDish(size);
 
     // populate the petri dish with cells or viruses randomly
     populatePetriDish(petriDish, size);
-    initBuffer(buffer, size);
-
-    // Gen 0 Print
-    petriDishToPPM(petriDish, size, 0);
+    populateBuffer(checkBuffer, size);
 
     // incubatePetriDish
-    incubatePetriDish(petriDish, buffer, size, gen);
+    incubatePetriDish(petriDish, checkBuffer, size, gen);
 
     return 0;
 }
@@ -54,14 +44,14 @@ struct Pixel** allocatePetriDish(int size)
     return petriDish;
 }
 
-void initBuffer(struct Pixel** buffer, int size)
+void populateBuffer(struct Pixel** buffer, int size)
 {
+    struct Pixel pixel = {255, 255, 255};
+
     for(int i = 0; i < size; i++)
     {
         for(int j = 0; j < size; j++)
         {
-            struct Pixel pixel = {255, 255, 255};
-
             buffer[i][j] = pixel;
         }
     }
@@ -76,17 +66,22 @@ void populatePetriDish(struct Pixel** petriDish, int size)
             // assume virus and cell both have 1% of spawning respectively, and 98% of empty area
             int randomPixel = rand() % 100;
 
+            // default value for pixel (white)
             struct Pixel pixel = {255, 255, 255};
 
-            // 98 means it's a virus (red)
-            if(isNotBorder(i, j, size) && randomPixel == 98)
+            // first, check if it is the border or not - if so, ignore
+            if(isNotBorder(i, j, size))
             {
-                pixel = (struct Pixel) {255, 0, 0};
-            }
-            // 99 means it's a cell (green)
-            else if(isNotBorder(i, j, size) && randomPixel == 99)
-            {
-                pixel = (struct Pixel) {0, 255, 0};
+                // 98 means it's a virus (red)
+                if(randomPixel == 98)
+                {
+                    pixel = (struct Pixel) {255, 0, 0};
+                }
+                // 99 means it's a cell (green)
+                else if(randomPixel == 99)
+                {
+                    pixel = (struct Pixel) {0, 255, 0};
+                }
             }
 
             petriDish[i][j] = pixel; 
@@ -94,48 +89,54 @@ void populatePetriDish(struct Pixel** petriDish, int size)
     }
 }
 
-int isNotBorder(int i, int j, int size)
+void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int size, int gen)
 {
-    if (i != 0 && i != size - 1 && j != 0 && j != size - 1)
-    {
-        return 1;   
-    }
- 
-    return 0;
-}
+    // Gen 0 Print
+    petriDishToPPM(petriDish, size, 0);
 
-void incubatePetriDish(struct Pixel** petriDish, struct Pixel** buffer, int size, int gen)
-{
+    struct Pixel centerPixel;
+
     // iterates from 1 to gen
     for(int i = 1; i <= gen; i++)
     {
+        populateBuffer(checkBuffer, size);
+
         // for this experiment, the edges are ignored and used as borders
         for(int x = 1; x < size - 1; x++)
         {
             for(int y = 1; y < size - 1; y++)
             {
-                struct Pixel centerPixel = petriDish[x][y];
+                // set the center pixel using petri dish
+                centerPixel = petriDish[x][y];
 
-                checkNeighbors(petriDish, buffer, centerPixel, x, y);
+                // only check if centerPixel isn't free
+                if(!isFree(centerPixel))
+                {
+                    // then give the center pixel to buffer
+                    checkBuffer[x][y] = centerPixel;
 
-                // checkNeighbors, then move
+                    // check the neighbors of the center pixel for infection
+                    checkNeighbors(petriDish, checkBuffer, centerPixel, x, y);
+
+                    // move pixel
+                    movePixel(checkBuffer, size, x, y);
+                } 
             }
         }
 
-        // switch pointers between petriDish and buffer
+        // switch pointers between petriDish and checkBuffer and moveBuffer
+        // FIXME
         struct Pixel** temp = petriDish;
-        petriDish = buffer;
-        buffer = temp;
+        petriDish = checkBuffer;
+        checkBuffer = temp;
 
         // print petri dish to ppm
         petriDishToPPM(petriDish, size, i);
     }
 }
 
-void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixel pixel, int x, int y)
+void checkNeighbors(struct Pixel** petriDish, struct Pixel** checkBuffer, struct Pixel pixel, int x, int y)
 {
-    buffer[x][y] = pixel;
-
     struct Pixel neighbor;
     struct Pixel newPixel;
 
@@ -145,60 +146,81 @@ void checkNeighbors(struct Pixel** petriDish, struct Pixel** buffer, struct Pixe
         {
             neighbor = petriDish[x + i][y + i];
 
-            // cell to virus infection (40% chance)
-            if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.blue == 0 && neighbor.green == 0)
+            // cell free infection (40% chance)
+            if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.green == 0 && neighbor.blue == 0)
             {
                 int chanceOfInfection = rand() % 100;
 
+                // (40% chance)
                 if(chanceOfInfection >= 40)
                 {
-                    // blue if it's a cell to virus infection
-                    newPixel = (struct Pixel) {0, 255, 0};
+                    printf("cell free\n");
 
-                    buffer[x][y] = newPixel;
+                    // blue if it's a cell to virus infection
+                    newPixel = (struct Pixel) {0, 0, 255};
+
+                    checkBuffer[x][y] = newPixel;
                 }
             }
-            // cell to cell infection (60% chance)
-            else if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.blue == 0 && neighbor.green == 255)
+            // cell to cell infection (60% chance) 
+            else if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 0 && neighbor.green == 0 && neighbor.blue == 255)
             {
                 int chanceOfInfection = rand() % 100;
 
+                // 60% chance
                 if(chanceOfInfection >= 60)
                 {
+                    printf("cell to cell\n");
+
                     // magneta if it's a cell to cell infection
                     newPixel = (struct Pixel) {255, 0, 255};
 
-                    buffer[x][y] = newPixel;
+                    checkBuffer[x][y] = newPixel;
                 }
             }
         }
     }
 }
 
-void movePixel(struct Pixel** buffer, int size, int x, int y)
+void movePixel(struct Pixel** checkBuffer, int size, int x, int y)
 {
-    // generates from -1 ... 1
+    // generates from -1 ... 1, used for picking a random position for the cell to move to
     int i = rand() % 3 - 1;
     int j = rand() % 3 - 1;
 
-    if(isNotBorder(x + i, y + j, size))
+    // check if the position the cell is moving to is the border
+    if(isNotBorder(x + i, y + j, size) && i != 0 && j != 0)
     {
-        struct Pixel neighbor = buffer[x + i][y + j];
+        struct Pixel neighbor = checkBuffer[x + i][y + j];
 
+        // then check if the neighbor is free
         if(isFree(neighbor))
         {
-            buffer[x + i][y + j] = buffer[x][y];
+            struct Pixel emptyPixel = (struct Pixel) {255, 255, 255};
+
+            checkBuffer[x + i][y + j] = checkBuffer[x][y];
+            checkBuffer[x][y] = emptyPixel;
         }
     }
 }
 
-int isFree(struct Pixel neighbor)
+int isFree(struct Pixel pixel)
 {
-    if(neighbor.red == 0 && neighbor.green == 0 && neighbor.blue == 0)
+    if(pixel.red == 255 && pixel.green == 255 && pixel.blue == 255)
     {
         return 1;
     }
 
+    return 0;
+}
+
+int isNotBorder(int i, int j, int size)
+{
+    if (i != 0 && i != size - 1 && j != 0 && j != size - 1)
+    {
+        return 1;   
+    }
+ 
     return 0;
 }
 
