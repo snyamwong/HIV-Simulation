@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "project.h"
+#include "mpi.h"
 
 /*
  *  TODO: parallel
@@ -125,12 +126,11 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int
         }
 
         // switch pointers between petriDish and checkBuffer and moveBuffer
-        // FIXME
         struct Pixel** temp = petriDish;
         petriDish = checkBuffer;
         checkBuffer = temp;
 
-        // print petri dish to ppm
+        // print petri dish to ppm after each gen
         petriDishToPPM(petriDish, size, i);
     }
 }
@@ -229,10 +229,12 @@ void petriDishToPPM(struct Pixel** petriDish, int size, int gen)
     // TODO: make sure that each node/processor prints to a different ppm, this can be done by printf to a file based on the node's rank
     // format: P3 = rgb color in ASCII, width and height in pixels, 255 is the max value of each color
 
+    // setting up filename, which will be in the directory results
     FILE* file;
-    char* filename = malloc(20 * sizeof(char));
-    sprintf(filename, "gen_%d_test.ppm", gen);
+    char* filename = malloc(45 * sizeof(char));
+    sprintf(filename, "results/gen_%d_test.ppm", gen);
 
+    // creates file or clears existing file
     file = fopen(filename, "w");
 
     fprintf(file, "P3\n%d %d\n255\n", size, size);     
