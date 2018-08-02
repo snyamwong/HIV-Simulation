@@ -8,4 +8,8 @@ Example:
 
 ./a.out 1 100
 
-The progrma will run with 1 generation, and a size of 100 x 100 petri dish.
+The program will run with 1 generation, and a size of 100 x 100 petri dish.
+
+Also, the PPM files will be outputted into a directory called results.
+
+Therefore, before you run the code, make sure you make a directory called results.
