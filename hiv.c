@@ -122,11 +122,11 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int s
     //Scatter petri dish to little petri buffers
     MPI_Scatter(petriDish, bufSize, mpiPixel, littlePetri, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
 
-    if(rank == 0) {
-	MPI_Sendrecv(littlePetri[bufSize-1],bufSize,mpiPixel,1,0,littlePetri[bufSize],bufSize,mpiPixel,0,rank+1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    if(rank == 0) { //bufSize-1 / bufsize
+	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,1,0,newPetri,bufSize,mpiPixel,0,rank+1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     }
-    else {
-	MPI_Sendrecv(littlePetri[1],bufSize,mpiPixel,rank+1,rank,littlePetri[bufSize+1],bufSize,mpiPixel,rank,rank-1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    else { //1 / bufSize+1
+	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,rank+1,rank,littlePetri,bufSize,mpiPixel,rank,rank-1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     }
 
     struct Pixel centerPixel;
