@@ -2,14 +2,31 @@
 #include <stdlib.h>
 #include <time.h>
 #include "project.h"
-//#include "mpi.h"
+#include "mpi.h"
 
 /*
  *  TODO: parallel
  *  TODO: better memory management (i.e convert petri dish to 1D array)
  */
+MPI_Datatype mpiPixel;
+
 int main(int argc, char** argv)
 {
+
+    //Initialize MPI environment
+    MPI_Init(&argc, &argv);
+
+    struct Pixel* petriDisheeetetr;
+
+
+    //Initialize MPI variables
+    int rank, numranks;
+    MPI_Comm_size(MPI_COMM_WORLD, &numranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
+
+    MPI_Type_create_resized(MPI_INT, 0, sizeof(struct Pixel), &mpiPixel);
+    MPI_Type_commit(&mpiPixel);
+
     // setting a seed for the random number generator
     srand(time(NULL));
 
@@ -28,7 +45,10 @@ int main(int argc, char** argv)
     populateBuffer(checkBuffer, size);
 
     // incubatePetriDish
-    incubatePetriDish(petriDish, checkBuffer, size, gen);
+    incubatePetriDish(petriDish, checkBuffer, size, gen, rank, numranks);
+
+    //Finalize MPI
+    MPI_Finalize();
 
     return 0;
 }
@@ -85,10 +105,29 @@ void populatePetriDish(struct Pixel* petriDish, int size)
     }
 }
 
-void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int size, int gen)
+void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int size, int gen, int rank, int numranks)
 {
     // Gen 0 Print
     petriDishToPPM(petriDish, size, 0);
+
+    int bufSize = size*size/numranks;
+
+    struct Pixel* littlePetri;
+    struct Pixel* newPetri;
+
+    //Create buffer for scatter
+    littlePetri = allocatePetriDish(bufSize);
+    newPetri = allocatePetriDish(bufSize);
+
+    //Scatter petri dish to little petri buffers
+    MPI_Scatter(petriDish, bufSize, mpiPixel, littlePetri, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
+
+    if(rank == 0) {
+	MPI_Sendrecv(littlePetri[bufSize-1],bufSize,mpiPixel,1,0,littlePetri[bufSize],bufSize,mpiPixel,0,rank+1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    }
+    else {
+	MPI_Sendrecv(littlePetri[1],bufSize,mpiPixel,rank+1,rank,littlePetri[bufSize+1],bufSize,mpiPixel,rank,rank-1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    }
 
     struct Pixel centerPixel;
 
@@ -259,3 +298,4 @@ void printPetriDish(struct Pixel* petriDish, int size)
         printf("\n");
     }
 }
+
