@@ -29,7 +29,7 @@ void populateBuffer(struct Pixel* buffer, int size);
 /**
  *  incubates the petri dish given the petri dish and number of generations
  */
-void incubatePetriDish(struct Pixel* petridish, struct Pixel* buffer, int size, int gen);
+void incubatePetriDish(struct Pixel* petridish, struct Pixel* buffer, int size, int gen, int rank, int numranks);
 
 /**
  *  checks if the neighbors of the cell are either infected or a virus
@@ -60,5 +60,3 @@ int isFree(struct Pixel pixel);
  *  checks if the given indices is part of the border
  */
 int isNotBorder(int i, int j, int size);
-
-
