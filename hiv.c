@@ -73,8 +73,18 @@ void populatePetriDish(struct Pixel** petriDish, int size)
             // first, check if it is the border or not - if so, ignore
             if(isNotBorder(i, j, size))
             {
+                // 96 means it's an infected cell by cell free
+                if(randomPixel == 96)
+                {
+                    pixel = (struct Pixel) {0, 0, 255};
+                }
+                // 97 means it's an infected cell by cell to cell
+                else if(random == 97)
+                {
+                    pixel = (struct Pixel) {255, 0, 255};
+                }
                 // 98 means it's a virus (red)
-                if(randomPixel == 98)
+                else if(randomPixel == 98)
                 {
                     pixel = (struct Pixel) {255, 0, 0};
                 }
@@ -154,32 +164,41 @@ void checkNeighbors(struct Pixel** petriDish, struct Pixel** checkBuffer, struct
                 // (40% chance)
                 if(chanceOfInfection >= 40)
                 {
-                    printf("cell free\n");
+                    printf("cell free infection at index x: %d y: %d\n", x, y);
 
                     // blue if it's a cell to virus infection
                     newPixel = (struct Pixel) {0, 0, 255};
 
                     checkBuffer[x][y] = newPixel;
+                    
+                    countCellFreeInfection++;
                 }
             }
             // cell to cell infection (60% chance) 
-            else if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 0 && neighbor.green == 0 && neighbor.blue == 255)
+            else if((pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 0 && neighbor.green == 0 && neighbor.blue == 255)
+                    ||
+                    (pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.green == 0 && neighbor.blue == 255))
             {
                 int chanceOfInfection = rand() % 100;
 
                 // 60% chance
                 if(chanceOfInfection >= 60)
                 {
-                    printf("cell to cell\n");
+                    printf("cell to cell infection at index x: %d y: %d\n", x, y);
 
                     // magneta if it's a cell to cell infection
                     newPixel = (struct Pixel) {255, 0, 255};
 
                     checkBuffer[x][y] = newPixel;
+                    
+                    countCellToCellInfection++;
                 }
             }
         }
     }
+    
+    printf("Cell to cell infections: %d\n", countCellToCellInfection);
+    printf("Cell Free infections: %d\n", countCellFreeInfection);
 }
 
 void movePixel(struct Pixel** checkBuffer, int size, int x, int y)
@@ -249,6 +268,8 @@ void petriDishToPPM(struct Pixel** petriDish, int size, int gen)
         fprintf(file, "\n");
     }
 
+    // freeing memory and closing file
+    free(filename)
     fclose(file);
 }
 
