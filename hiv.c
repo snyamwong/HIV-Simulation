@@ -127,16 +127,16 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int s
     //Scatter petri dish to little petri buffers
     MPI_Scatter(petriDish, bufSize, mpiPixel, littlePetri, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
 
-    //Halo Exchange - need to move neighbor checking in halo exchange
+    //Halo Exchange between littlePetri - still need to do neighbor checking
     if(rank == 0) { //bufSize-1 / bufsize
-	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,1,0,newPetri,bufSize,mpiPixel,0,rank+1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,1,0,littlePetri,bufSize,mpiPixel,0,rank+1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     }
     else { //1 / bufSize+1
 	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,rank+1,rank,littlePetri,bufSize,mpiPixel,rank,rank-1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     }
 
     //Gather to new all little petri dishes
-    MPI_Gather(littlePetri, bufSize, mpiPixel, newPetri, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
+    MPI_Gather(littlePetri, bufSize, mpiPixel, petriDish, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
     struct Pixel centerPixel;
 
     // iterates from 1 to gen
