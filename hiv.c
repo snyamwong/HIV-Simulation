@@ -24,6 +24,7 @@ int main(int argc, char** argv)
     MPI_Comm_size(MPI_COMM_WORLD, &numranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
 
+    //Create a datatype for Pixel
     MPI_Type_create_resized(MPI_INT, 0, sizeof(struct Pixel), &mpiPixel);
     MPI_Type_commit(&mpiPixel);
 
@@ -37,12 +38,16 @@ int main(int argc, char** argv)
     struct Pixel* petriDish;
     struct Pixel* checkBuffer;
 
-    petriDish = allocatePetriDish(size);
-    checkBuffer = allocatePetriDish(size);
+    if(rank == 0) {
 
-    // populate the petri dish with cells or viruses randomly
-    populatePetriDish(petriDish, size);
-    populateBuffer(checkBuffer, size);
+	petriDish = allocatePetriDish(size);
+	checkBuffer = allocatePetriDish(size);
+
+	// populate the petri dish with cells or viruses randomly
+	populatePetriDish(petriDish, size);
+	populateBuffer(checkBuffer, size);
+
+    } //end if rank == 0
 
     // incubatePetriDish
     incubatePetriDish(petriDish, checkBuffer, size, gen, rank, numranks);
@@ -122,6 +127,7 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int s
     //Scatter petri dish to little petri buffers
     MPI_Scatter(petriDish, bufSize, mpiPixel, littlePetri, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
 
+    //Halo Exchange - need to move neighbor checking in halo exchange
     if(rank == 0) { //bufSize-1 / bufsize
 	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,1,0,newPetri,bufSize,mpiPixel,0,rank+1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     }
@@ -129,6 +135,8 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int s
 	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,rank+1,rank,littlePetri,bufSize,mpiPixel,rank,rank-1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     }
 
+    //Gather to new all little petri dishes
+    MPI_Gather(littlePetri, bufSize, mpiPixel, newPetri, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
     struct Pixel centerPixel;
 
     // iterates from 1 to gen
