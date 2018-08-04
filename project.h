@@ -16,6 +16,11 @@ struct Pixel
  */
 struct Pixel* allocatePetriDish(int size);
 
+/*
+ * allocates sendcounts and disp array for gatherv
+ */
+void allocateSendcountsDisplacement(int* sendcounts, int* disp, int size);
+
 /**
  *  populates the petri dish with healthy cells and viruses
  */
@@ -29,7 +34,7 @@ void populateBuffer(struct Pixel* buffer, int size);
 /**
  *  incubates the petri dish given the petri dish and number of generations
  */
-void incubatePetriDish(struct Pixel* petridish, struct Pixel* buffer, int size, int gen);
+void incubatePetriDish(struct Pixel* petridish, struct Pixel* buffer, int gen, int size);
 
 /**
  *  checks if the neighbors of the cell are either infected or a virus
