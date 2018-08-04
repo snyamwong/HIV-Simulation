@@ -251,7 +251,8 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
 
                     checkBuffer[x * size + y] = newPixel;
 
-                    countCellToCellInfection++;
+
+                    countCellFreeInfection++;
                 }
             }
             // cell to cell infection (60% chance)
@@ -272,7 +273,7 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
 
                     checkBuffer[x * size + y] = newPixel;
 
-                    countCellFreeInfection++;
+                    countCellToCellInfection++;
                 }
             }
         }
