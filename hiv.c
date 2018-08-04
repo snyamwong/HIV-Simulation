@@ -5,10 +5,12 @@
 #include "mpi.h"
 
 int rank, numRank;
+int countCellToCellInfection = 0, countCellFreeInfection = 0;
 
 /*
  *  TODO: parallel
- *  TODO: better memory management (i.e convert petri dish to 1D array)
+ *  TODO: figure out how to send petriDish with ghost rows
+ *  TODO: calculate the occurences of infections by both cell free and cell to cell
  */
 int main(int argc, char** argv)
 {
@@ -171,6 +173,11 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
         myend = size;
     }
 
+    // Debug messages for range, mystart, myend
+    printf("Range: %d\n", range);
+    printf("mystart: %d\n", mystart);
+    printf("myend: %d\n", myend);
+
     struct Pixel centerPixel;
 
     // iterates from 1 to gen
@@ -205,6 +212,8 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
         // reducing in place with checkBuffer, MPI_SUM is okay because we don't allow collosion and the default value of checkBuffer is 0
         MPI_Allreduce(MPI_IN_PLACE, checkBuffer, size * size, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
+        MPI_Barrier(MPI_COMM_WORLD);
+
         // switch pointers between petriDish and checkBuffer and moveBuffer
         struct Pixel* temp = petriDish;
         petriDish = checkBuffer;
@@ -235,12 +244,14 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
                 // (40% chance)
                 if(chanceOfInfection >= 40)
                 {
-                    // printf("cell free\n");
+                    printf("cell free infection at index x: %d y: %d\n", x, y);
 
                     // blue if it's a cell to virus infection
                     newPixel = (struct Pixel) {0, 0, 255};
 
                     checkBuffer[x * size + y] = newPixel;
+
+                    countCellToCellInfection++;
                 }
             }
             // cell to cell infection (60% chance)
@@ -254,12 +265,14 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
                 // 60% chance
                 if(chanceOfInfection >= 60)
                 {
-                    // printf("cell to cell\n");
+                    printf("cell to cell infection at index x: %d y: %d\n", x, y);
 
                     // magneta if it's a cell to cell infection
                     newPixel = (struct Pixel) {255, 0, 255};
 
                     checkBuffer[x * size + y] = newPixel;
+
+                    countCellFreeInfection++;
                 }
             }
         }
@@ -275,14 +288,14 @@ void movePixel(struct Pixel* checkBuffer, int size, int x, int y)
     // check if the position the cell is moving to is the border
     if(isNotBorder(x + i, y + j, size) && i != 0 && j != 0)
     {
-        struct Pixel neighbor = checkBuffer[(x+i)*size+(y+i)];
+        struct Pixel neighbor = checkBuffer[(x + i) * size + (y + j)];
 
         // then check if the neighbor is free
         if(isFree(neighbor))
         {
             struct Pixel emptyPixel = (struct Pixel) {255, 255, 255};
 
-            checkBuffer[(x + i) * size + (y + i)] = checkBuffer[x * size + y];
+            checkBuffer[(x + i) * size + (y + j)] = checkBuffer[x * size + y];
             checkBuffer[x * size + y] = emptyPixel;
         }
     }
