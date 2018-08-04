@@ -8,64 +8,70 @@
  *  TODO: parallel
  *  TODO: better memory management (i.e convert petri dish to 1D array)
  */
-MPI_Datatype mpiPixel;
+
+MPI_Datatype MPI_PIXEL;
 
 int main(int argc, char** argv)
 {
-
-    //Initialize MPI environment
-    MPI_Init(&argc, &argv);
-
-    struct Pixel* petriDisheeetetr;
-
-
-    //Initialize MPI variables
-    int rank, numranks;
-    MPI_Comm_size(MPI_COMM_WORLD, &numranks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-
-    //Create a datatype for Pixel
-    MPI_Type_create_resized(MPI_INT, 0, sizeof(struct Pixel), &mpiPixel);
-    MPI_Type_commit(&mpiPixel);
-
     // setting a seed for the random number generator
     srand(time(NULL));
 
     int gen = atoi(argv[1]);
     int size = atoi(argv[2]);
 
+    //Initalize MPI
+    MPI_Init(&argc, &argv);
+    int rank, numranks;
+    MPI_Comm_size(MPI_COMM_WORLD, &numranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    //Create datatype for Pixel
+    int nitems = 3;
+    int blocklengths[3] = {255, 255, 255};
+    MPI_Aint offsets[3];
+    MPI_Datatype types[3] = {MPI_INT, MPI_INT, MPI_INT};
+    MPI_Datatype MPI_PIXEL;
+
+    offsets[0] = offsetof(struct Pixel, red);
+    offsets[1] = offsetof(struct Pixel, green);
+    offsets[2] = offsetof(struct Pixel, blue);
+
+    MPI_Type_create_struct(nitems, blocklengths, offsets, types, &MPI_PIXEL);
+    MPI_Type_commit(&MPI_PIXEL);
+
     // allocate (dynamically) memory to the petriDish, and init all memory locations to be whitespace
-    struct Pixel* petriDish;
-    struct Pixel* checkBuffer;
+    struct Pixel** petriDish;
+    struct Pixel** checkBuffer;
 
-    if(rank == 0) {
-
-	petriDish = allocatePetriDish(size);
-	checkBuffer = allocatePetriDish(size);
+    
+    petriDish = allocatePetriDish(size);
+    checkBuffer = allocatePetriDish(size);
 
 	// populate the petri dish with cells or viruses randomly
 	populatePetriDish(petriDish, size);
 	populateBuffer(checkBuffer, size);
 
-    } //end if rank == 0
-
     // incubatePetriDish
     incubatePetriDish(petriDish, checkBuffer, size, gen, rank, numranks);
 
-    //Finalize MPI
-    MPI_Finalize();
+   MPI_Finalize();
 
     return 0;
 }
 
-struct Pixel* allocatePetriDish(int size)
+struct Pixel** allocatePetriDish(int size)
 {
-    struct Pixel* petriDish = malloc(size * size * sizeof(struct Pixel));
+    struct Pixel** petriDish = malloc(size * sizeof(struct Pixel*)); 
+
+    for(int i = 0; i < size; i++)
+    {
+        petriDish[i] = malloc(size * sizeof(struct Pixel));
+    }
 
     return petriDish;
 }
 
-void populateBuffer(struct Pixel* buffer, int size)
+void populateBuffer(struct Pixel** buffer, int size)
 {
     struct Pixel pixel = {255, 255, 255};
 
@@ -73,12 +79,12 @@ void populateBuffer(struct Pixel* buffer, int size)
     {
         for(int j = 0; j < size; j++)
         {
-            buffer[i*size+j] = pixel;
+            buffer[i][j] = pixel;
         }
     }
 }
 
-void populatePetriDish(struct Pixel* petriDish, int size)
+void populatePetriDish(struct Pixel** petriDish, int size)
 {
     for(int i = 0; i < size; i++)
     {
@@ -105,43 +111,30 @@ void populatePetriDish(struct Pixel* petriDish, int size)
                 }
             }
 
-            petriDish[i*size+j] = pixel;
+            petriDish[i][j] = pixel; 
         }
     }
 }
 
-void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int size, int gen, int rank, int numranks)
+void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int size, int gen, int rank, int numranks)
 {
     // Gen 0 Print
     petriDishToPPM(petriDish, size, 0);
 
-    int bufSize = size*size/numranks;
-
-    struct Pixel* littlePetri;
-    struct Pixel* newPetri;
-
-    //Create buffer for scatter
-    littlePetri = allocatePetriDish(bufSize);
-    newPetri = allocatePetriDish(bufSize);
-
-    //Scatter petri dish to little petri buffers
-    MPI_Scatter(petriDish, bufSize, mpiPixel, littlePetri, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
-
-    //Halo Exchange between littlePetri - still need to do neighbor checking
-    if(rank == 0) { //bufSize-1 / bufsize
-	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,1,0,littlePetri,bufSize,mpiPixel,0,rank+1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-    }
-    else { //1 / bufSize+1
-	MPI_Sendrecv(littlePetri,bufSize,mpiPixel,rank+1,rank,littlePetri,bufSize,mpiPixel,rank,rank-1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-    }
-
-    //Gather to new all little petri dishes
-    MPI_Gather(littlePetri, bufSize, mpiPixel, petriDish, bufSize, mpiPixel, 0, MPI_COMM_WORLD);
     struct Pixel centerPixel;
+
+    int left = (rank-1+size)%size;
+    int right = (rank+1)%size;
 
     // iterates from 1 to gen
     for(int i = 1; i <= gen; i++)
     {
+
+	//Halo Exchange between petri dishes
+	MPI_Sendrecv(petriDish[1], size+2, MPI_PIXEL, left, 0, petriDish[size+1], size+2, MPI_PIXEL, right, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+	MPI_Sendrecv(petriDish[size], size+2, MPI_PIXEL, rank, 0, petriDish[0], size+2, MPI_PIXEL, left, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
         populateBuffer(checkBuffer, size);
 
         // for this experiment, the edges are ignored and used as borders
@@ -150,16 +143,16 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int s
             for(int y = 1; y < size - 1; y++)
             {
                 // set the center pixel using petri dish
-                centerPixel = petriDish[x*size+y];
+                centerPixel = petriDish[x][y];
 
                 // only check if centerPixel isn't free
                 if(!isFree(centerPixel))
                 {
                     // then give the center pixel to buffer
-                    checkBuffer[x*size+y] = centerPixel;
+                    checkBuffer[x][y] = centerPixel;
 
                     // check the neighbors of the center pixel for infection
-                    checkNeighbors(petriDish, checkBuffer, centerPixel, x, y, size);
+                    checkNeighbors(petriDish, checkBuffer, centerPixel, x, y);
 
                     // move pixel
                     movePixel(checkBuffer, size, x, y);
@@ -168,7 +161,7 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int s
         }
 
         // switch pointers between petriDish and checkBuffer and moveBuffer
-        struct Pixel* temp = petriDish;
+        struct Pixel** temp = petriDish;
         petriDish = checkBuffer;
         checkBuffer = temp;
 
@@ -177,7 +170,7 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int s
     }
 }
 
-void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct Pixel pixel, int x, int y, int size)
+void checkNeighbors(struct Pixel** petriDish, struct Pixel** checkBuffer, struct Pixel pixel, int x, int y)
 {
     struct Pixel neighbor;
     struct Pixel newPixel;
@@ -186,8 +179,8 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
     {
         for(int j = -1; j <= 1; j++)
         {
-            //neighbor = petriDish[x + i][y + i];
-            neighbor = petriDish[(x+i)*size+(y+i)];
+            neighbor = petriDish[x + i][y + i];
+
             // cell free infection (40% chance)
             if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.green == 0 && neighbor.blue == 0)
             {
@@ -201,7 +194,7 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
                     // blue if it's a cell to virus infection
                     newPixel = (struct Pixel) {0, 0, 255};
 
-                    checkBuffer[x*size+y] = newPixel;
+                    checkBuffer[x][y] = newPixel;
                 }
             }
             // cell to cell infection (60% chance) 
@@ -217,14 +210,14 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
                     // magneta if it's a cell to cell infection
                     newPixel = (struct Pixel) {255, 0, 255};
 
-                    checkBuffer[x*size+y] = newPixel;
+                    checkBuffer[x][y] = newPixel;
                 }
             }
         }
     }
 }
 
-void movePixel(struct Pixel* checkBuffer, int size, int x, int y)
+void movePixel(struct Pixel** checkBuffer, int size, int x, int y)
 {
     // generates from -1 ... 1, used for picking a random position for the cell to move to
     int i = rand() % 3 - 1;
@@ -233,15 +226,15 @@ void movePixel(struct Pixel* checkBuffer, int size, int x, int y)
     // check if the position the cell is moving to is the border
     if(isNotBorder(x + i, y + j, size) && i != 0 && j != 0)
     {
-        struct Pixel neighbor = checkBuffer[(x+i)*size+(y+i)];
+        struct Pixel neighbor = checkBuffer[x + i][y + j];
 
         // then check if the neighbor is free
         if(isFree(neighbor))
         {
             struct Pixel emptyPixel = (struct Pixel) {255, 255, 255};
 
-            checkBuffer[(x+i)*size+(y+i)] = checkBuffer[x*size+y];
-            checkBuffer[x*size+y] = emptyPixel;
+            checkBuffer[x + i][y + j] = checkBuffer[x][y];
+            checkBuffer[x][y] = emptyPixel;
         }
     }
 }
@@ -266,7 +259,7 @@ int isNotBorder(int i, int j, int size)
     return 0;
 }
 
-void petriDishToPPM(struct Pixel* petriDish, int size, int gen)
+void petriDishToPPM(struct Pixel** petriDish, int size, int gen)
 {
     // TODO: make sure that each node/processor prints to a different ppm, this can be done by printf to a file based on the node's rank
     // format: P3 = rgb color in ASCII, width and height in pixels, 255 is the max value of each color
@@ -285,7 +278,7 @@ void petriDishToPPM(struct Pixel* petriDish, int size, int gen)
     {
         for(int j = 0; j < size; j++)
         {
-            fprintf(file, "%d %d %d ", petriDish[i*size+j].red, petriDish[i*size+j].green, petriDish[i*size+j].blue);
+            fprintf(file, "%d %d %d ", petriDish[i][j].red, petriDish[i][j].green, petriDish[i][j].blue);
         }
 
         fprintf(file, "\n");
@@ -294,16 +287,15 @@ void petriDishToPPM(struct Pixel* petriDish, int size, int gen)
     fclose(file);
 }
 
-void printPetriDish(struct Pixel* petriDish, int size)
+void printPetriDish(struct Pixel** petriDish, int size)
 {
     for(int i = 0; i < size; i++)
     {   
         for(int j = 0; j < size; j++)
         {
-            printf("%d %d %d ", petriDish[i*size+j].red, petriDish[i*size+j].green, petriDish[i*size+j].blue);
+            printf("%d %d %d ", petriDish[i][j].red, petriDish[i][j].green, petriDish[i][j].blue);
         }
 
         printf("\n");
     }
 }
-
