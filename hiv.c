@@ -8,9 +8,7 @@ int rank, numRank;
 int countCellToCellInfection = 0, countCellFreeInfection = 0;
 
 /*
- *  TODO: parallel
- *  TODO: figure out how to send petriDish with ghost rows
- *  TODO: calculate the occurences of infections by both cell free and cell to cell
+
  */
 int main(int argc, char** argv)
 {
@@ -70,29 +68,6 @@ struct Pixel* allocatePetriDish(int size)
     struct Pixel* petriDish = malloc(size * size * sizeof(struct Pixel));
 
     return petriDish;
-}
-
-void allocateSendcountsDisplacement(int* sendcounts, int* disp, int size)
-{
-    int mySize = size / numRank * size;
-
-    sendcounts = malloc(numRank * sizeof(int));
-
-    disp = malloc(numRank * sizeof(int));
-    disp[0] = 0;
-
-    for(int i = 0; i < numRank; i++)
-    {
-        sendcounts[i] = mySize;
-    }
-    
-    int remainder = size % numRank * size;
-    sendcounts[numRank - 1] += remainder;
-
-    for(int i = 1; i < numRank; i++)
-    {
-        disp[i] = disp[i - 1] + sendcounts[i - 1];
-    }
 }
 
 void populateBuffer(struct Pixel* buffer, int size)
@@ -155,9 +130,6 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
     // Gen 0 Print
     petriDishToPPM(petriDish, size, 0);
 
-    // the portion sent to every processor
-    int mySize = size / numRank * size;
-
     // range should always start at the beginning of a row and end at the end of a row
     // it should never stop midway, thus you wouldn't do (size * size) / numRank
     // +1 to mystart and -1 to myend is to ignore borders
@@ -171,9 +143,11 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
     }
 
     // Debug messages for range, mystart, myend
+    /*
     printf("Range: %d\n", range);
     printf("mystart: %d\n", mystart);
     printf("myend: %d\n", myend);
+    */
 
     struct Pixel centerPixel;
 
@@ -219,6 +193,15 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
         // print petri dish to ppm after each gen
         petriDishToPPM(petriDish, size, i);
     }
+
+    /*
+    MPI_Allreduce(MPI_IN_PLACE, countCellFreeInfection, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, countCellToCellInfection, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    
+    printf("Cell Free Infections: %d\n", countCellFreeInfection);
+    printf("Cell to Cell Infections: %d\n", countCellToCellInfection);
+
+    */
 }
 
 void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct Pixel pixel, int x, int y, int size)
@@ -241,13 +224,12 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
                 // (40% chance)
                 if(chanceOfInfection >= 40)
                 {
-                    printf("cell free infection at index x: %d y: %d\n", x, y);
+                    // printf("cell free infection at index x: %d y: %d\n", x, y);
 
                     // blue if it's a cell to virus infection
                     newPixel = (struct Pixel) {0, 0, 255};
 
                     checkBuffer[x * size + y] = newPixel;
-
 
                     countCellFreeInfection++;
                 }
@@ -263,7 +245,7 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
                 // 60% chance
                 if(chanceOfInfection >= 60)
                 {
-                    printf("cell to cell infection at index x: %d y: %d\n", x, y);
+                    // printf("cell to cell infection at index x: %d y: %d\n", x, y);
 
                     // magneta if it's a cell to cell infection
                     newPixel = (struct Pixel) {255, 0, 255};
