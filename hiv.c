@@ -4,6 +4,10 @@
 #include "project.h"
 #include "mpi.h"
 #include <math.h>
+#include <omp.h>
+
+int rank, numRank;
+int countCellToCellInfection = 0, countCellFreeInfection = 0;
 
 /*
  *  TODO: parallel
@@ -80,20 +84,26 @@ void populateBuffer(struct Pixel** buffer, int size)
 {
     struct Pixel pixel = {255, 255, 255};
 
-    for(int i = 0; i < size; i++)
+    int i,j;
+    #pragma omp parallel for private(i,j)
+    for(i = 0; i < size; i++)
     {
-        for(int j = 0; j < size; j++)
+        for(j = 0; j < size; j++)
         {
             buffer[i][j] = pixel;
         }
     }
+    #pragma omp barrier
+
 }
 
 void populatePetriDish(struct Pixel** petriDish, int size)
 {
-    for(int i = 0; i < size + 2; i++)
+    int i, j;
+    #pragma omp parallel private(i, j)
+    for(i = 0; i < size + 2; i++)
     {
-        for(int j = 0; j < size; j++)
+        for(j = 0; j < size; j++)
         {
             // assume virus and cell both have 1% of spawning respectively, and 98% of empty area
             int randomPixel = rand() % 100;
@@ -122,6 +132,7 @@ void populatePetriDish(struct Pixel** petriDish, int size)
             petriDish[i][j] = pixel;
         }
     }
+    #pragma omp barrier
 }
 
 void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int size, int gen)
@@ -153,7 +164,9 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int
     if(prev<0) prev = MPI_PROC_NULL;
 
     // iterates from 1 to gen
-    for(int i = 1; i <= gen; i++)
+    int i, x, y;
+    #pragma omp parallel private(i, x, y, next, prev)
+    for(i = 1; i <= gen; i++)
     {
         populateBuffer(checkBuffer, size);
 
@@ -161,9 +174,9 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int
         MPI_Sendrecv(petriDish[1],size,MPI_PIXEL,prev,0,petriDish[size+1],size,MPI_PIXEL,next,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 
         // for this experiment, the edges are ignored and used as borders
-        for(int x = 1; x < size - 1; x++)
+        for(x = 1; x < size - 1; x++)
         {
-            for(int y = 1; y < size - 1; y++)
+            for(y = 1; y < size - 1; y++)
             {
                 // set the center pixel using petri dish
                 centerPixel = petriDish[x][y];
@@ -193,6 +206,7 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int
             petriDishToPPM(petriDish, size, i);
         }
     }
+    #pragma omp barrier
 
 }
 
@@ -202,9 +216,11 @@ void checkNeighbors(struct Pixel** petriDish, struct Pixel** checkBuffer, struct
     struct Pixel neighbor;
     struct Pixel newPixel;
 
-    for(int i = -1; i <= 1; i++)
+    int i,j;
+    // #pragma omp parallel for private(neighbor, x, y, i, j)
+    for(i = -1; i <= 1; i++)
     {
-        for(int j = -1; j <= 1; j++)
+        for(j = -1; j <= 1; j++)
         {
             neighbor = petriDish[x + i][y + j];
 
@@ -242,6 +258,8 @@ void checkNeighbors(struct Pixel** petriDish, struct Pixel** checkBuffer, struct
             }
         }
     }
+    #pragma omp barrier
+
 }
 
 void movePixel(struct Pixel** checkBuffer, int size, int x, int y)
