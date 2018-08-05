@@ -149,6 +149,20 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
     printf("myend: %d\n", myend);
     */
 
+    // make struct Pixel a datatype
+    int nitems = 3;
+    int blocklengths[3] = {1, 1, 1};
+    MPI_Aint offsets[3];
+    MPI_Datatype types[3] = {MPI_INT, MPI_INT, MPI_INT};
+    MPI_Datatype MPI_PIXEL;
+
+    offsets[0] = offsetof(struct Pixel, red);
+    offsets[1] = offsetof(struct Pixel, green);
+    offsets[2] = offsetof(struct Pixel, blue);
+
+    MPI_Type_create_struct(nitems, blocklengths, offsets, types, &MPI_PIXEL);
+    MPI_Type_commit(&MPI_PIXEL);
+
     struct Pixel centerPixel;
 
     // iterates from 1 to gen
@@ -181,9 +195,9 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
         }
 
         // reducing in place with checkBuffer, MPI_SUM is okay because we don't allow collosion and the default value of checkBuffer is 0
-        MPI_Allreduce(MPI_IN_PLACE, checkBuffer, size * size, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+        // MPI_Allreduce(MPI_IN_PLACE, checkBuffer, size * size, MPI_PIXEL, MPI_SUM, MPI_COMM_WORLD);
 
-        MPI_Barrier(MPI_COMM_WORLD);
+        // MPI_Barrier(MPI_COMM_WORLD);
 
         // switch pointers between petriDish and checkBuffer and moveBuffer
         struct Pixel* temp = petriDish;
@@ -191,7 +205,10 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
         checkBuffer = temp;
 
         // print petri dish to ppm after each gen
-        petriDishToPPM(petriDish, size, i);
+        if(rank == 0)
+        {
+            petriDishToPPM(petriDish, size, i);
+        }
     }
 
     /*
