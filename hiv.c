@@ -3,6 +3,7 @@
 #include <time.h>
 #include "project.h"
 #include "mpi.h"
+#include <math.h>
 
 /*
  *  TODO: parallel
@@ -19,7 +20,7 @@ int main(int argc, char** argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // setting a seed for the random number generator
-    srand(time(NULL) + rank);
+    srand(time(NULL));
 
     int gen = atoi(argv[1]);
     int size = atoi(argv[2]);
@@ -36,7 +37,27 @@ int main(int argc, char** argv)
     populateBuffer(checkBuffer, size);
 
     // incubatePetriDish
+    MPI_Barrier(MPI_COMM_WORLD);
+    double start = MPI_Wtime();
     incubatePetriDish(petriDish, checkBuffer, size, gen);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    double end = MPI_Wtime();
+
+    //free petriDish and checkBuffer
+    for(int i = 0; i < size + 2; i++){
+        free(petriDish[i]);
+    }
+    free(petriDish);
+
+    for(int j = 0; j < size; j++){
+        free(checkBuffer[j]);
+    }
+    free(checkBuffer);
+
+    if(rank == 0){
+        printf("Total Time: %f", end - start);
+    }
 
     MPI_Finalize();
 
@@ -107,7 +128,7 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int
 {
     //make struct Pixel a data type
     int nitems = 3;
-    int blocklengths[3] = {255, 255, 255};
+    int blocklengths[3] = {1, 1, 1};
     MPI_Aint offsets[3];
     MPI_Datatype types[3] = {MPI_INT, MPI_INT, MPI_INT};
     MPI_Datatype MPI_PIXEL;
@@ -140,7 +161,7 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int
         MPI_Sendrecv(petriDish[1],size,MPI_PIXEL,prev,0,petriDish[size+1],size,MPI_PIXEL,next,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 
         // for this experiment, the edges are ignored and used as borders
-        /*for(int x = 1; x < size - 1; x++)
+        for(int x = 1; x < size - 1; x++)
         {
             for(int y = 1; y < size - 1; y++)
             {
@@ -169,10 +190,8 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int
 
         // print petri dish to ppm after each gen
         if(rank == 0){
-           petriDishToPPM(petriDish, size, i);
-      }*/
-
-        petriDishToPPM(petriDish, size, gen);
+            petriDishToPPM(petriDish, size, i);
+        }
     }
 
 }
@@ -187,7 +206,7 @@ void checkNeighbors(struct Pixel** petriDish, struct Pixel** checkBuffer, struct
     {
         for(int j = -1; j <= 1; j++)
         {
-            neighbor = petriDish[x + i][y + i];
+            neighbor = petriDish[x + i][y + j];
 
             // cell free infection (40% chance)
             if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.green == 0 && neighbor.blue == 0)
@@ -197,7 +216,7 @@ void checkNeighbors(struct Pixel** petriDish, struct Pixel** checkBuffer, struct
                 // (40% chance)
                 if(chanceOfInfection >= 40)
                 {
-                    printf("cell free\n");
+                    //printf("cell free\n");
 
                     // blue if it's a cell to virus infection
                     newPixel = (struct Pixel) {0, 0, 255};
@@ -213,7 +232,7 @@ void checkNeighbors(struct Pixel** petriDish, struct Pixel** checkBuffer, struct
                 // 60% chance
                 if(chanceOfInfection >= 60)
                 {
-                    printf("cell to cell\n");
+                    //printf("cell to cell\n");
 
                     // magneta if it's a cell to cell infection
                     newPixel = (struct Pixel) {255, 0, 255};
@@ -275,7 +294,7 @@ void petriDishToPPM(struct Pixel** petriDish, int size, int gen)
     // setting up filename, which will be in the directory results
     FILE* file;
     char* filename = malloc(45 * sizeof(char));
-    sprintf(filename, "results/%d_gen_%d_test.ppm",rank,gen);
+    sprintf(filename, "results/gen_%d_test.ppm",gen);
 
     // creates file or clears existing file
     file = fopen(filename, "w");
