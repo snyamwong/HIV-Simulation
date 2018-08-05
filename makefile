@@ -6,8 +6,8 @@ FLAGS = -std=c11 -lm
 
 RM = /bin/rm
 
-PROGS = hiv.cx
-OBJS = hiv.o
+PROGS = hiv_bcast.cx
+OBJS = hiv_bcast.o
 
 #all rule
 all: $(PROGS)
@@ -17,10 +17,10 @@ all: $(PROGS)
 
 export TAU_MAKEFILE=/opt/sw/tau/x86_64/lib/Makefile.tau-mpi-pdt
 
-hiv.o:	hiv.c
+hiv_bcast.o:	hiv_bcast.c
 	$(FCC) $(FLAGS) -c $^ -o $@
 
-hiv.cx:	hiv.o
+hiv_bcast.cx:	hiv_bcast.o
 	$(LDC) $(LD_FLAGS) $< -o $@
 
 #clean rule

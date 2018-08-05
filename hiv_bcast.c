@@ -48,8 +48,19 @@ int main(int argc, char** argv)
         populateBuffer(checkBuffer, size);
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    double startBcast = MPI_Wtime();
+
     MPI_Bcast(petriDish, (size * size), MPI_PIXEL, 0, MPI_COMM_WORLD); 
     MPI_Bcast(checkBuffer, (size * size), MPI_PIXEL, 0, MPI_COMM_WORLD);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(rank == 0)
+    {
+        printf("Using %d nodes\n", numRank);
+
+        printf("Bcast timing: %f\n", MPI_Wtime() - startBcast);
+    }
 
     // incubatePetriDish
     incubatePetriDish(petriDish, checkBuffer, gen, size);
@@ -128,14 +139,14 @@ void populatePetriDish(struct Pixel* petriDish, int size)
 void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int gen, int size)
 {
     // Gen 0 Print
-    petriDishToPPM(petriDish, size, 0);
+    // petriDishToPPM(petriDish, size, 0);
 
     // range should always start at the beginning of a row and end at the end of a row
     // it should never stop midway, thus you wouldn't do (size * size) / numRank
     // +1 to mystart and -1 to myend is to ignore borders
     int range = (size / numRank);
-    int mystart = rank * range + 1;
-    int myend = mystart + range - 1;
+    int mystart = rank * range;
+    int myend = mystart + range;
 
     if(myend > size)
     {
@@ -149,21 +160,10 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
     printf("myend: %d\n", myend);
     */
 
-    // make struct Pixel a datatype
-    int nitems = 3;
-    int blocklengths[3] = {1, 1, 1};
-    MPI_Aint offsets[3];
-    MPI_Datatype types[3] = {MPI_INT, MPI_INT, MPI_INT};
-    MPI_Datatype MPI_PIXEL;
-
-    offsets[0] = offsetof(struct Pixel, red);
-    offsets[1] = offsetof(struct Pixel, green);
-    offsets[2] = offsetof(struct Pixel, blue);
-
-    MPI_Type_create_struct(nitems, blocklengths, offsets, types, &MPI_PIXEL);
-    MPI_Type_commit(&MPI_PIXEL);
-
     struct Pixel centerPixel;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    double startGenTime = MPI_Wtime();
 
     // iterates from 1 to gen
     for(int i = 1; i <= gen; i++)
@@ -207,8 +207,14 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
         // print petri dish to ppm after each gen
         if(rank == 0)
         {
-            petriDishToPPM(petriDish, size, i);
+            // petriDishToPPM(petriDish, size, i);
         }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(rank == 0)
+    {
+        printf("Incubate time: %f\n", MPI_Wtime() - startGenTime);
     }
 
     /*
