@@ -1,0 +1,25 @@
+#!/bin/bash
+#PBS -l nodes=4:ppn=12
+#PBS -l walltime=00:10:00
+#PBS -q batch
+#PBS -N run
+#PBS -j oe
+
+#cat $PBS_NODEFILE
+
+export TAU_MAKEFILE=/opt/sw/tau/x86_64/lib/Makefile.tau-mpi-pdt
+
+cd ~/project
+
+rm profile.*
+rm pprof_*
+
+for i in {2..4}
+do
+
+    mpiexec -np $i --map-by ppr:1:node --hostfile $PBS_NODEFILE ./a.out 1 100
+    pprof > pprof_numrank_$i.txt
+
+    rm profile.*
+
+done
