@@ -23,7 +23,7 @@ int main(int argc, char** argv)
 
     // make struct Pixel a datatype
     int nitems = 3;
-    int blocklengths[3] = {255, 255, 255};
+    int blocklengths[3] = {1, 1, 1};
     MPI_Aint offsets[3];
     MPI_Datatype types[3] = {MPI_INT, MPI_INT, MPI_INT};
     MPI_Datatype MPI_PIXEL;
@@ -39,22 +39,19 @@ int main(int argc, char** argv)
     int size = atoi(argv[2]);
 
     // allocate (dynamically) memory to the petriDish, and init all memory locations to be whitespace
-    struct Pixel* petriDish;
-    struct Pixel* checkBuffer;
+    struct Pixel* petriDish = allocatePetriDish(size);
+    struct Pixel* checkBuffer = allocatePetriDish(size);
 
     // have only rank 0 allocate memory for petri dish, then broadcast it to everyone
     if(rank == 0)
     {
-        petriDish = allocatePetriDish(size);
-        checkBuffer = allocatePetriDish(size);
+        // populate the petri dish with cells or viruses randomly
+        populatePetriDish(petriDish, size);
+        populateBuffer(checkBuffer, size);
     }
 
-    MPI_Bcast(petriDish, size * size, MPI_PIXEL, 0, MPI_COMM_WORLD); 
-    MPI_Bcast(checkBuffer, size * size, MPI_PIXEL, 0, MPI_COMM_WORLD);
-
-    // populate the petri dish with cells or viruses randomly
-    populatePetriDish(petriDish, size);
-    populateBuffer(checkBuffer, size);
+    MPI_Bcast(petriDish, (size * size), MPI_PIXEL, 0, MPI_COMM_WORLD); 
+    MPI_Bcast(checkBuffer, (size * size), MPI_PIXEL, 0, MPI_COMM_WORLD);
 
     // incubatePetriDish
     incubatePetriDish(petriDish, checkBuffer, gen, size);

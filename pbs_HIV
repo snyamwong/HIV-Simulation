@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l nodes=2:ppn=12
+#PBS -l nodes=2:ppn=1
 #PBS -l walltime=00:00:10
 #PBS -q batch
 #PBS -N run
@@ -11,4 +11,4 @@ cd ~/project/results
 rm gen_*
 
 cd ~/project
-mpiexec -np 2 --map-by ppr:1:node --hostfile $PBS_NODEFILE ./a.out 1 100
+mpiexec -np 2 --map-by ppr:1:node --hostfile $PBS_NODEFILE ./a.out 1 50
