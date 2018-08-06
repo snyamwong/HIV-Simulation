@@ -3,6 +3,7 @@
 #include <time.h>
 #include "hiv_bcast.h"
 #include "mpi.h"
+#include <omp.h>
 
 int rank, numRank;
 int countCellToCellInfection = 0, countCellFreeInfection = 0;
@@ -93,6 +94,7 @@ void populateBuffer(struct Pixel* buffer, int size)
 {
     struct Pixel pixel = {255, 255, 255};
 
+    #pragma omp parallel for schedule(dynamic)
     for(int i = 0; i < size; i++)
     {
         for(int j = 0; j < size; j++)
@@ -104,6 +106,7 @@ void populateBuffer(struct Pixel* buffer, int size)
 
 void populatePetriDish(struct Pixel* petriDish, int size)
 {
+    #pragma omp parallel for schedule(dynamic)
     for(int i = 0; i < size; i++)
     {
         for(int j = 0; j < size; j++)
@@ -336,8 +339,9 @@ void petriDishToPPM(struct Pixel* petriDish, int size, int gen)
     // creates file or clears existing file
     file = fopen(filename, "w");
 
-    fprintf(file, "P3\n%d %d\n255\n", size, size);     
+    fprintf(file, "P3\n%d %d\n255\n", size, size);
 
+    #pragma omp parallel for schedule(dynamic)
     for(int i = 0; i < size; i++)
     {
         for(int j = 0; j < size; j++)
@@ -355,6 +359,7 @@ void petriDishToPPM(struct Pixel* petriDish, int size, int gen)
 
 void printPetriDish(struct Pixel* petriDish, int size)
 {
+    #pragma omp parallel for schedule(dynamic)
     for(int i = 0; i < size; i++)
     {   
         for(int j = 0; j < size; j++)
