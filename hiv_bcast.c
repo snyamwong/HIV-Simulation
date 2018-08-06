@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include "project.h"
+#include "hiv_bcast.h"
 #include "mpi.h"
 
 int rank, numRank;

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include "project.h"
+#include "hiv_halo.h"
 #include "mpi.h"
 #include <math.h>
 
