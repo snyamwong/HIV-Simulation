@@ -62,8 +62,16 @@ int main(int argc, char** argv)
         printf("Bcast timing: %f\n", MPI_Wtime() - startBcast);
     }
 
+    double startGenTime = MPI_Wtime();
+
     // incubatePetriDish
     incubatePetriDish(petriDish, checkBuffer, gen, size);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(rank == 0)
+    {
+        printf("Incubate time: %f\n", MPI_Wtime() - startGenTime);
+    }
 
     // apparently it's good practice to free memory even when your program is closing - so...
     free(petriDish);
@@ -162,9 +170,6 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
 
     struct Pixel centerPixel;
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    double startGenTime = MPI_Wtime();
-
     // iterates from 1 to gen
     for(int i = 1; i <= gen; i++)
     {
@@ -211,12 +216,6 @@ void incubatePetriDish(struct Pixel* petriDish, struct Pixel* checkBuffer, int g
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    if(rank == 0)
-    {
-        printf("Incubate time: %f\n", MPI_Wtime() - startGenTime);
-    }
-
     /*
     MPI_Allreduce(MPI_IN_PLACE, countCellFreeInfection, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     MPI_Allreduce(MPI_IN_PLACE, countCellToCellInfection, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -237,7 +236,7 @@ void checkNeighbors(struct Pixel* petriDish, struct Pixel* checkBuffer, struct P
         for(int j = -1; j <= 1; j++)
         {
             //neighbor = petriDish[x + i][y + i];
-            neighbor = petriDish[(x + i) * size + (y + i)];
+            neighbor = petriDish[(x + i) * size + (y + j)];
 
             // cell free infection (40% chance)
             if(pixel.red == 0 && pixel.green == 255 && pixel.blue == 0 && neighbor.red == 255 && neighbor.green == 0 && neighbor.blue == 0)
