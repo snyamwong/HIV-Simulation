@@ -36,13 +36,16 @@ int main(int argc, char** argv)
     populatePetriDish(petriDish, size);
     populateBuffer(checkBuffer, size);
 
+    double start, end;
+
     // incubatePetriDish
     MPI_Barrier(MPI_COMM_WORLD);
-    double start = MPI_Wtime();
+    start = MPI_Wtime();
+
     incubatePetriDish(petriDish, checkBuffer, size, gen);
 
     MPI_Barrier(MPI_COMM_WORLD);
-    double end = MPI_Wtime();
+    end = MPI_Wtime();
 
     //free petriDish and checkBuffer
     for(int i = 0; i < size + 2; i++){
@@ -56,7 +59,7 @@ int main(int argc, char** argv)
     free(checkBuffer);
 
     if(rank == 0){
-        printf("Total Time: %f", end - start);
+        printf("Number of Nodes: %d Total Time: %f\n",numranks,end - start);
     }
 
     MPI_Finalize();
@@ -189,9 +192,9 @@ void incubatePetriDish(struct Pixel** petriDish, struct Pixel** checkBuffer, int
         checkBuffer = temp;
 
         // print petri dish to ppm after each gen
-        if(rank == 0){
-            petriDishToPPM(petriDish, size, i);
-        }
+        /*if(rank == 0){
+           petriDishToPPM(petriDish, size, i);
+      }*/
     }
 
 }
