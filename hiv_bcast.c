@@ -341,7 +341,6 @@ void petriDishToPPM(struct Pixel* petriDish, int size, int gen)
 
     fprintf(file, "P3\n%d %d\n255\n", size, size);
 
-    #pragma omp parallel for schedule(dynamic)
     for(int i = 0; i < size; i++)
     {
         for(int j = 0; j < size; j++)
@@ -359,7 +358,6 @@ void petriDishToPPM(struct Pixel* petriDish, int size, int gen)
 
 void printPetriDish(struct Pixel* petriDish, int size)
 {
-    #pragma omp parallel for schedule(dynamic)
     for(int i = 0; i < size; i++)
     {   
         for(int j = 0; j < size; j++)
