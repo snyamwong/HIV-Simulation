@@ -19,3 +19,7 @@ The program will run with 1 generation, and a size of 100 x 100 petri dish.
 ## Note
 
 The print method (printPetriDishToPPM) will be automatically disabled, since PPM files are quite enourmous. Uncomment the method if you wish to see the output of the program.
+
+For hiv_bcast, uncomment line 215.
+
+For hiv_halo, uncomment line 195 - 197.
